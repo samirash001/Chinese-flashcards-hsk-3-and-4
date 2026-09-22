@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chinese Character Flashcards</title>
+<style>
+  :root { --bg:#f4f6f8; --card:#fff; --text:#17202a; --muted:#68727d; --accent:#2563eb; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:Arial,system-ui,sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+  .wrap { max-width:900px; margin:0 auto; padding:24px; }
+  header { display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; }
+  h1 { margin:0 0 6px; font-size:28px; }
+  .sub { color:var(--muted); }
+  .controls { display:flex; gap:8px; flex-wrap:wrap; margin:20px 0; }
+  select, button { border:1px solid #ccd3da; border-radius:10px; padding:10px 14px; background:white; font-size:15px; cursor:pointer; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .progress { color:var(--muted); margin-bottom:10px; }
+  .card { height:430px; perspective:1000px; cursor:pointer; }
+  .inner { position:relative; width:100%; height:100%; transition:transform .45s; transform-style:preserve-3d; }
+  .card.flipped .inner { transform:rotateY(180deg); }
+  .face { position:absolute; inset:0; backface-visibility:hidden; border-radius:24px; background:var(--card); box-shadow:0 12px 35px rgba(0,0,0,.10); display:flex; flex-direction:column; align-items:center; justify-content:center; padding:30px; text-align:center; }
+  .back { transform:rotateY(180deg); }
+  .word { font-size:110px; line-height:1.1; font-family:"Noto Sans CJK SC","Microsoft YaHei",sans-serif; }
+  .pinyin { font-size:40px; margin-top:22px; }\n  .meaning { font-size:27px; margin-top:14px; color:#334155; }
+  .hint { color:var(--muted); margin-top:18px; }
+  .lesson { position:absolute; top:20px; left:24px; color:var(--muted); font-size:14px; }
+  .nav { display:flex; justify-content:center; gap:10px; margin-top:18px; flex-wrap:wrap; }
+  .nav button { min-width:110px; }
+  .rating, .statusControls { display:flex; justify-content:center; gap:10px; margin-top:12px; flex-wrap:wrap; }
+  .rating button { min-width:150px; }
+  .statusControls select, .statusControls button { min-width:190px; }
+  .rating button.active { border-color:var(--accent); box-shadow:0 0 0 2px rgba(37,99,235,.12); }
+  .small { font-size:13px; color:var(--muted); text-align:center; margin-top:18px; line-height:1.5; }
+  @media(max-width:600px) {
+    .card { height:360px; }
+    .word { font-size:78px; }
+    .pinyin { font-size:30px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Chinese Character Flashcards</h1>
+      <div class="sub">Click the card to reveal the pinyin.</div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <select id="lesson"></select>
+    <button id="shuffle">Shuffle</button>
+    <button id="reset">Reset</button>
+  </div>
+
+  <div class="progress" id="progress"></div>
+
+  <div class="card" id="card" tabindex="0" aria-label="Flashcard">
+    <div class="inner">
+      <div class="face front">
+        <div class="lesson" id="frontLesson"></div>
+        <div class="word" id="frontWord"></div>
+        <div class="hint">Click to reveal • then the next word appears automatically</div>
+      </div>
+      <div class="face back">
+        <div class="lesson" id="backLesson"></div>
+        <div class="word" id="backWord"></div>
+        <div class="pinyin" id="backPinyin"></div>
+        <div class="meaning" id="backMeaning"></div>
+        <div class="hint">Next word in a moment…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="nav">
+    <button id="prev">← Previous</button>
+    <button class="primary" id="show">Show Answer</button>
+    <button id="next">Next →</button>
+  </div>
+
+  <div class="rating">
+    <button id="comfortable" title="Remove this card from normal review">✓ Comfortable</button>
+    <button id="difficult" title="Keep this card marked for extra review">★ Difficult</button>
+    <button id="clearDifficult" title="Remove the difficult mark from this card">☆ Clear Difficult</button>
+  </div>
+
+  <div class="statusControls">
+    <select id="statusFilter" aria-label="Card status">
+      <option value="ALL">All cards</option>
+      <option value="DIFFICULT">★ Difficult only</option>
+      <option value="COMFORTABLE">✓ Comfortable only</option>
+    </select>
+    <button id="resetComfortable">Reset Comfortable Marks</button>
+  </div>
+
+  <div class="small">
+    Keyboard: ← / → to move &nbsp; • &nbsp; Space to flip &nbsp; • &nbsp; R to shuffle
+  </div>
+</div>
+
+<script>
+const allCards = [{"word": "法律", "lesson": "Day 1 — Lesson 1", "pinyin": "fǎlǜ", "meaning": "law"}, {"word": "俩", "lesson": "Day 1 — Lesson 1", "pinyin": "liǎ", "meaning": "both; the two of us"}, {"word": "印象", "lesson": "Day 1 — Lesson 1", "pinyin": "yìnxiàng", "meaning": "impression"}, {"word": "深", "lesson": "Day 1 — Lesson 1", "pinyin": "shēn", "meaning": "deep"}, {"word": "熟悉", "lesson": "Day 1 — Lesson 1", "pinyin": "shúxī", "meaning": "familiar with"}, {"word": "不仅", "lesson": "Day 1 — Lesson 1", "pinyin": "bùjǐn", "meaning": "not only"}, {"word": "性格", "lesson": "Day 1 — Lesson 1", "pinyin": "xìnggé", "meaning": "personality"}, {"word": "开玩笑", "lesson": "Day 1 — Lesson 1", "pinyin": "kāi wánxiào", "meaning": "to joke; kid"}, {"word": "从来", "lesson": "Day 1 — Lesson 1", "pinyin": "cónglái", "meaning": "always; ever"}, {"word": "最好", "lesson": "Day 1 — Lesson 1", "pinyin": "zuìhǎo", "meaning": "best; had better"}, {"word": "共同", "lesson": "Day 1 — Lesson 1", "pinyin": "gòngtóng", "meaning": "common; shared"}, {"word": "适合", "lesson": "Day 1 — Lesson 1", "pinyin": "shìhé", "meaning": "to suit; be suitable for"}, {"word": "幸福", "lesson": "Day 1 — Lesson 1", "pinyin": "xìngfú", "meaning": "happiness; happy"}, {"word": "生活", "lesson": "Day 1 — Lesson 1", "pinyin": "shēnghuó", "meaning": "life; to live"}, {"word": "刚", "lesson": "Day 1 — Lesson 1", "pinyin": "gāng", "meaning": "just; just now"}, {"word": "浪漫", "lesson": "Day 1 — Lesson 1", "pinyin": "làngmàn", "meaning": "romantic"}, {"word": "够", "lesson": "Day 1 — Lesson 1", "pinyin": "gòu", "meaning": "enough; sufficient"}, {"word": "缺点", "lesson": "Day 1 — Lesson 1", "pinyin": "quēdiǎn", "meaning": "shortcoming; disadvantage"}, {"word": "接受", "lesson": "Day 1 — Lesson 1", "pinyin": "jiēshòu", "meaning": "to accept"}, {"word": "羡慕", "lesson": "Day 1 — Lesson 1", "pinyin": "xiànmù", "meaning": "to envy; admire"}, {"word": "爱情", "lesson": "Day 1 — Lesson 1", "pinyin": "àiqíng", "meaning": "love; romantic love"}, {"word": "星星", "lesson": "Day 1 — Lesson 1", "pinyin": "xīngxing", "meaning": "star"}, {"word": "即使", "lesson": "Day 1 — Lesson 1", "pinyin": "jíshǐ", "meaning": "even if"}, {"word": "加班", "lesson": "Day 1 — Lesson 1", "pinyin": "jiābān", "meaning": "to work overtime"}, {"word": "亮", "lesson": "Day 1 — Lesson 1", "pinyin": "liàng", "meaning": "bright; light"}, {"word": "感动", "lesson": "Day 1 — Lesson 1", "pinyin": "gǎndòng", "meaning": "to move; be touched"}, {"word": "自然", "lesson": "Day 1 — Lesson 1", "pinyin": "zìrán", "meaning": "natural; naturally"}, {"word": "原因", "lesson": "Day 1 — Lesson 1", "pinyin": "yuányīn", "meaning": "reason; cause"}, {"word": "互相", "lesson": "Day 1 — Lesson 1", "pinyin": "hùxiāng", "meaning": "each other"}, {"word": "吸引", "lesson": "Day 1 — Lesson 1", "pinyin": "xīyǐn", "meaning": "to attract"}, {"word": "幽默", "lesson": "Day 1 — Lesson 1", "pinyin": "yōumò", "meaning": "humorous; humor"}, {"word": "脾气", "lesson": "Day 1 — Lesson 1", "pinyin": "píqi", "meaning": "temper"}, {"word": "适应", "lesson": "Day 2 — Lesson 2", "pinyin": "shìyìng", "meaning": "to adapt; adjust to"}, {"word": "交", "lesson": "Day 2 — Lesson 2", "pinyin": "jiāo", "meaning": "to hand over; make friends"}, {"word": "平时", "lesson": "Day 2 — Lesson 2", "pinyin": "píngshí", "meaning": "usually; ordinarily"}, {"word": "逛", "lesson": "Day 2 — Lesson 2", "pinyin": "guàng", "meaning": "to stroll; browse"}, {"word": "短信", "lesson": "Day 2 — Lesson 2", "pinyin": "duǎnxìn", "meaning": "text message"}, {"word": "正好", "lesson": "Day 2 — Lesson 2", "pinyin": "zhènghǎo", "meaning": "just right; happen to"}, {"word": "聚会", "lesson": "Day 2 — Lesson 2", "pinyin": "jùhuì", "meaning": "gathering; party"}, {"word": "联系", "lesson": "Day 2 — Lesson 2", "pinyin": "liánxì", "meaning": "to contact; connection"}, {"word": "差不多", "lesson": "Day 2 — Lesson 2", "pinyin": "chàbuduō", "meaning": "almost; about the same"}, {"word": "专门", "lesson": "Day 2 — Lesson 2", "pinyin": "zhuānmén", "meaning": "specially; specifically"}, {"word": "毕业", "lesson": "Day 2 — Lesson 2", "pinyin": "bìyè", "meaning": "to graduate; graduation"}, {"word": "麻烦", "lesson": "Day 2 — Lesson 2", "pinyin": "máfan", "meaning": "trouble; troublesome"}, {"word": "好像", "lesson": "Day 2 — Lesson 2", "pinyin": "hǎoxiàng", "meaning": "seem; as if"}, {"word": "重新", "lesson": "Day 2 — Lesson 2", "pinyin": "chóngxīn", "meaning": "again; anew"}, {"word": "尽管", "lesson": "Day 2 — Lesson 2", "pinyin": "jǐnguǎn", "meaning": "although; despite"}, {"word": "真正", "lesson": "Day 2 — Lesson 2", "pinyin": "zhēnzhèng", "meaning": "real; genuine; truly"}, {"word": "友谊", "lesson": "Day 2 — Lesson 2", "pinyin": "yǒuyì", "meaning": "friendship"}, {"word": "丰富", "lesson": "Day 2 — Lesson 2", "pinyin": "fēngfù", "meaning": "rich; abundant"}, {"word": "无聊", "lesson": "Day 2 — Lesson 2", "pinyin": "wúliáo", "meaning": "boring; bored"}, {"word": "讨厌", "lesson": "Day 2 — Lesson 2", "pinyin": "tǎoyàn", "meaning": "to dislike; annoying"}, {"word": "却", "lesson": "Day 2 — Lesson 2", "pinyin": "què", "meaning": "but; yet"}, {"word": "周围", "lesson": "Day 2 — Lesson 2", "pinyin": "zhōuwéi", "meaning": "around; surroundings"}, {"word": "交流", "lesson": "Day 2 — Lesson 2", "pinyin": "jiāoliú", "meaning": "to communicate; exchange"}, {"word": "理解", "lesson": "Day 2 — Lesson 2", "pinyin": "lǐjiě", "meaning": "to understand"}, {"word": "镜子", "lesson": "Day 2 — Lesson 2", "pinyin": "jìngzi", "meaning": "mirror"}, {"word": "而", "lesson": "Day 2 — Lesson 2", "pinyin": "ér", "meaning": "and; but; while"}, {"word": "当", "lesson": "Day 2 — Lesson 2", "pinyin": "dāng", "meaning": "when; act as; be"}, {"word": "困难", "lesson": "Day 2 — Lesson 2", "pinyin": "kùnnan", "meaning": "difficulty; difficult"}, {"word": "及时", "lesson": "Day 2 — Lesson 2", "pinyin": "jíshí", "meaning": "in time; promptly"}, {"word": "陪", "lesson": "Day 2 — Lesson 2", "pinyin": "péi", "meaning": "to accompany"}, {"word": "挺", "lesson": "Day 3 — Lesson 3", "pinyin": "tǐng", "meaning": "quite; rather"}, {"word": "紧张", "lesson": "Day 3 — Lesson 3", "pinyin": "jǐnzhāng", "meaning": "nervous; tense"}, {"word": "信心", "lesson": "Day 3 — Lesson 3", "pinyin": "xìnxīn", "meaning": "confidence"}, {"word": "能力", "lesson": "Day 3 — Lesson 3", "pinyin": "nénglì", "meaning": "ability; capability"}, {"word": "招聘", "lesson": "Day 3 — Lesson 3", "pinyin": "zhāopìn", "meaning": "to recruit; recruitment"}, {"word": "提供", "lesson": "Day 3 — Lesson 3", "pinyin": "tígōng", "meaning": "to provide"}, {"word": "负责", "lesson": "Day 3 — Lesson 3", "pinyin": "fùzé", "meaning": "to be responsible for"}, {"word": "本来", "lesson": "Day 3 — Lesson 3", "pinyin": "běnlái", "meaning": "originally; as it happens"}, {"word": "应聘", "lesson": "Day 3 — Lesson 3", "pinyin": "yìngpìn", "meaning": "to apply for a job"}, {"word": "材料", "lesson": "Day 3 — Lesson 3", "pinyin": "cáiliào", "meaning": "material; documents"}, {"word": "符合", "lesson": "Day 3 — Lesson 3", "pinyin": "fúhé", "meaning": "to conform to; meet"}, {"word": "通知", "lesson": "Day 3 — Lesson 3", "pinyin": "tōngzhī", "meaning": "to notify; notice"}, {"word": "律师", "lesson": "Day 3 — Lesson 3", "pinyin": "lǜshī", "meaning": "lawyer"}, {"word": "专业", "lesson": "Day 3 — Lesson 3", "pinyin": "zhuānyè", "meaning": "major; professional"}, {"word": "另外", "lesson": "Day 3 — Lesson 3", "pinyin": "lìngwài", "meaning": "in addition; besides"}, {"word": "收入", "lesson": "Day 3 — Lesson 3", "pinyin": "shōurù", "meaning": "income"}, {"word": "咱们", "lesson": "Day 3 — Lesson 3", "pinyin": "zánmen", "meaning": "we; us"}, {"word": "安排", "lesson": "Day 3 — Lesson 3", "pinyin": "ānpái", "meaning": "to arrange; arrangement"}, {"word": "首先", "lesson": "Day 3 — Lesson 3", "pinyin": "shǒuxiān", "meaning": "first; firstly"}, {"word": "正式", "lesson": "Day 3 — Lesson 3", "pinyin": "zhèngshì", "meaning": "formal; official"}, {"word": "留", "lesson": "Day 3 — Lesson 3", "pinyin": "liú", "meaning": "to stay; leave behind"}, {"word": "其次", "lesson": "Day 3 — Lesson 3", "pinyin": "qícì", "meaning": "secondly"}, {"word": "诚实", "lesson": "Day 3 — Lesson 3", "pinyin": "chéngshí", "meaning": "honest"}, {"word": "改变", "lesson": "Day 3 — Lesson 3", "pinyin": "gǎibiàn", "meaning": "to change"}, {"word": "感觉", "lesson": "Day 3 — Lesson 3", "pinyin": "gǎnjué", "meaning": "feeling; to feel"}, {"word": "判断", "lesson": "Day 3 — Lesson 3", "pinyin": "pànduàn", "meaning": "to judge; judgment"}, {"word": "顾客", "lesson": "Day 3 — Lesson 3", "pinyin": "gùkè", "meaning": "customer"}, {"word": "准时", "lesson": "Day 3 — Lesson 3", "pinyin": "zhǔnshí", "meaning": "on time; punctual"}, {"word": "不管", "lesson": "Day 3 — Lesson 3", "pinyin": "bùguǎn", "meaning": "no matter; regardless"}, {"word": "与", "lesson": "Day 3 — Lesson 3", "pinyin": "yǔ", "meaning": "and; with"}, {"word": "约会", "lesson": "Day 3 — Lesson 3", "pinyin": "yuēhuì", "meaning": "date; appointment"}, {"word": "提", "lesson": "Day 4 — Lesson 4", "pinyin": "tí", "meaning": "to mention; raise; carry"}, {"word": "以为", "lesson": "Day 4 — Lesson 4", "pinyin": "yǐwéi", "meaning": "to think; assume"}, {"word": "份", "lesson": "Day 4 — Lesson 4", "pinyin": "fèn", "meaning": "measure word for documents/jobs; portion"}, {"word": "完全", "lesson": "Day 4 — Lesson 4", "pinyin": "wánquán", "meaning": "completely; entirely"}, {"word": "赚", "lesson": "Day 4 — Lesson 4", "pinyin": "zhuàn", "meaning": "to earn"}, {"word": "调查", "lesson": "Day 4 — Lesson 4", "pinyin": "diàochá", "meaning": "to investigate; survey"}, {"word": "原来", "lesson": "Day 4 — Lesson 4", "pinyin": "yuánlái", "meaning": "originally; it turns out"}, {"word": "计划", "lesson": "Day 4 — Lesson 4", "pinyin": "jìhuà", "meaning": "plan; to plan"}, {"word": "提前", "lesson": "Day 4 — Lesson 4", "pinyin": "tíqián", "meaning": "in advance; ahead of time"}, {"word": "保证", "lesson": "Day 4 — Lesson 4", "pinyin": "bǎozhèng", "meaning": "to guarantee; assure"}, {"word": "提醒", "lesson": "Day 4 — Lesson 4", "pinyin": "tíxǐng", "meaning": "to remind"}, {"word": "乱", "lesson": "Day 4 — Lesson 4", "pinyin": "luàn", "meaning": "messy; disorderly"}, {"word": "生意", "lesson": "Day 4 — Lesson 4", "pinyin": "shēngyi", "meaning": "business"}, {"word": "谈", "lesson": "Day 4 — Lesson 4", "pinyin": "tán", "meaning": "to talk; discuss"}, {"word": "并", "lesson": "Day 4 — Lesson 4", "pinyin": "bìng", "meaning": "and; furthermore"}, {"word": "积累", "lesson": "Day 4 — Lesson 4", "pinyin": "jīlěi", "meaning": "to accumulate"}, {"word": "经验", "lesson": "Day 4 — Lesson 4", "pinyin": "jīngyàn", "meaning": "experience"}, {"word": "一切", "lesson": "Day 4 — Lesson 4", "pinyin": "yíqiè", "meaning": "everything; all"}, {"word": "按照", "lesson": "Day 4 — Lesson 4", "pinyin": "ànzhào", "meaning": "according to; in accordance with"}, {"word": "成功", "lesson": "Day 4 — Lesson 4", "pinyin": "chénggōng", "meaning": "success; to succeed"}, {"word": "顺利", "lesson": "Day 4 — Lesson 4", "pinyin": "shùnlì", "meaning": "smoothly; successful"}, {"word": "感谢", "lesson": "Day 4 — Lesson 4", "pinyin": "gǎnxiè", "meaning": "to thank; thanks"}, {"word": "消息", "lesson": "Day 4 — Lesson 4", "pinyin": "xiāoxi", "meaning": "news; message"}, {"word": "按时", "lesson": "Day 4 — Lesson 4", "pinyin": "ànshí", "meaning": "on time"}, {"word": "奖金", "lesson": "Day 4 — Lesson 4", "pinyin": "jiǎngjīn", "meaning": "bonus"}, {"word": "工资", "lesson": "Day 4 — Lesson 4", "pinyin": "gōngzī", "meaning": "salary; wages"}, {"word": "方法", "lesson": "Day 4 — Lesson 4", "pinyin": "fāngfǎ", "meaning": "method; way"}, {"word": "只是", "lesson": "Day 4 — Lesson 4", "pinyin": "zhǐshì", "meaning": "only; merely"}, {"word": "不得不", "lesson": "Day 4 — Lesson 4", "pinyin": "bùdébù", "meaning": "have to; be forced to"}, {"word": "甚至", "lesson": "Day 4 — Lesson 4", "pinyin": "shènzhì", "meaning": "even"}, {"word": "责任", "lesson": "Day 4 — Lesson 4", "pinyin": "zérèn", "meaning": "responsibility"}, {"word": "家具", "lesson": "Lesson 5", "pinyin": "jiājù", "meaning": "furniture"}, {"word": "沙发", "lesson": "Lesson 5", "pinyin": "shāfā", "meaning": "sofa"}, {"word": "打折", "lesson": "Lesson 5", "pinyin": "dǎzhé", "meaning": "to discount; be on sale"}, {"word": "价格", "lesson": "Lesson 5", "pinyin": "jiàgé", "meaning": "price"}, {"word": "质量", "lesson": "Lesson 5", "pinyin": "zhìliàng", "meaning": "quality"}, {"word": "肯定", "lesson": "Lesson 5", "pinyin": "kěndìng", "meaning": "certainly; definitely"}, {"word": "流行", "lesson": "Lesson 5", "pinyin": "liúxíng", "meaning": "popular; fashionable"}, {"word": "顺便", "lesson": "Lesson 5", "pinyin": "shùnbiàn", "meaning": "conveniently; by the way"}, {"word": "台", "lesson": "Lesson 5", "pinyin": "tái", "meaning": "measure word for machines"}, {"word": "光", "lesson": "Lesson 5", "pinyin": "guāng", "meaning": "only; merely; light"}, {"word": "实在", "lesson": "Lesson 5", "pinyin": "shízài", "meaning": "really; indeed"}, {"word": "制冷", "lesson": "Lesson 5", "pinyin": "zhìlěng", "meaning": "refrigeration; to cool"}, {"word": "效果", "lesson": "Lesson 5", "pinyin": "xiàoguǒ", "meaning": "effect; result"}, {"word": "现金", "lesson": "Lesson 5", "pinyin": "xiànjīn", "meaning": "cash"}, {"word": "邀请", "lesson": "Lesson 5", "pinyin": "yāoqǐng", "meaning": "to invite; invitation"}, {"word": "葡萄", "lesson": "Lesson 5", "pinyin": "pútá", "meaning": "grape"}, {"word": "艺术", "lesson": "Lesson 5", "pinyin": "yìshù", "meaning": "art"}, {"word": "广告", "lesson": "Lesson 5", "pinyin": "guǎnggào", "meaning": "advertisement"}, {"word": "味道", "lesson": "Lesson 5", "pinyin": "wèidào", "meaning": "taste; flavor; smell"}, {"word": "优点", "lesson": "Lesson 5", "pinyin": "yōudiǎn", "meaning": "advantage; strong point"}, {"word": "实际", "lesson": "Lesson 5", "pinyin": "shíjì", "meaning": "actual; practical"}, {"word": "考虑", "lesson": "Lesson 5", "pinyin": "kǎolǜ", "meaning": "to consider"}, {"word": "标准", "lesson": "Lesson 5", "pinyin": "biāozhǔn", "meaning": "standard"}, {"word": "样子", "lesson": "Lesson 5", "pinyin": "yàngzi", "meaning": "appearance; look"}, {"word": "年龄", "lesson": "Lesson 5", "pinyin": "niánlíng", "meaning": "age"}, {"word": "浪费", "lesson": "Lesson 5", "pinyin": "làngfèi", "meaning": "to waste; waste"}, {"word": "购物", "lesson": "Lesson 5", "pinyin": "gòuwù", "meaning": "shopping; to shop"}, {"word": "尤其", "lesson": "Lesson 5", "pinyin": "yóuqí", "meaning": "especially"}, {"word": "受到", "lesson": "Lesson 5", "pinyin": "shòudào", "meaning": "to receive; be affected by"}, {"word": "任何", "lesson": "Lesson 5", "pinyin": "rènhé", "meaning": "any; whatever"}, {"word": "寄", "lesson": "Lesson 5", "pinyin": "jì", "meaning": "to mail; send"}, {"word": "果汁", "lesson": "Day 7 — Lesson 6", "pinyin": "guǒzhī", "meaning": "fruit juice"}, {"word": "售货员", "lesson": "Day 7 — Lesson 6", "pinyin": "shòuhuòyuán", "meaning": "sales clerk"}, {"word": "袜子", "lesson": "Day 7 — Lesson 6", "pinyin": "wàzi", "meaning": "socks"}, {"word": "打扰", "lesson": "Day 7 — Lesson 6", "pinyin": "dǎrǎo", "meaning": "to disturb; bother"}, {"word": "竟然", "lesson": "Day 7 — Lesson 6", "pinyin": "jìngrán", "meaning": "unexpectedly; actually"}, {"word": "西红柿", "lesson": "Day 7 — Lesson 6", "pinyin": "xīhóngshì", "meaning": "tomato"}, {"word": "百分之", "lesson": "Day 7 — Lesson 6", "pinyin": "bǎifēnzhī", "meaning": "percent"}, {"word": "倍", "lesson": "Day 7 — Lesson 6", "pinyin": "bèi", "meaning": "times; -fold"}, {"word": "皮肤", "lesson": "Day 7 — Lesson 6", "pinyin": "pífū", "meaning": "skin"}, {"word": "好处", "lesson": "Day 7 — Lesson 6", "pinyin": "hǎochu", "meaning": "benefit; advantage"}, {"word": "尝", "lesson": "Day 7 — Lesson 6", "pinyin": "cháng", "meaning": "to taste; try"}, {"word": "轻", "lesson": "Day 7 — Lesson 6", "pinyin": "qīng", "meaning": "light; not heavy"}, {"word": "方面", "lesson": "Day 7 — Lesson 6", "pinyin": "fāngmiàn", "meaning": "aspect; respect"}, {"word": "值得", "lesson": "Day 7 — Lesson 6", "pinyin": "zhíde", "meaning": "to be worth"}, {"word": "活动", "lesson": "Day 7 — Lesson 6", "pinyin": "huódòng", "meaning": "activity; event"}, {"word": "内", "lesson": "Day 7 — Lesson 6", "pinyin": "nèi", "meaning": "inside; within"}, {"word": "免费", "lesson": "Day 7 — Lesson 6", "pinyin": "miǎnfèi", "meaning": "free of charge"}, {"word": "修理", "lesson": "Day 7 — Lesson 6", "pinyin": "xiūlǐ", "meaning": "to repair"}, {"word": "支持", "lesson": "Day 7 — Lesson 6", "pinyin": "zhīchí", "meaning": "to support"}, {"word": "举行", "lesson": "Day 7 — Lesson 6", "pinyin": "jǔxíng", "meaning": "to hold; conduct"}, {"word": "满", "lesson": "Day 7 — Lesson 6", "pinyin": "mǎn", "meaning": "full; filled"}, {"word": "其中", "lesson": "Day 7 — Lesson 6", "pinyin": "qízhōng", "meaning": "among them; therein"}, {"word": "小说", "lesson": "Day 7 — Lesson 6", "pinyin": "xiǎoshuō", "meaning": "novel; fiction"}, {"word": "会员卡", "lesson": "Day 7 — Lesson 6", "pinyin": "huìyuánkǎ", "meaning": "membership card"}, {"word": "所有", "lesson": "Day 7 — Lesson 6", "pinyin": "suǒyǒu", "meaning": "all; all of"}, {"word": "获得", "lesson": "Day 7 — Lesson 6", "pinyin": "huòdé", "meaning": "to obtain; gain"}, {"word": "情况", "lesson": "Day 7 — Lesson 6", "pinyin": "qíngkuàng", "meaning": "situation; circumstances"}, {"word": "例如", "lesson": "Day 7 — Lesson 6", "pinyin": "lìrú", "meaning": "for example"}, {"word": "举办", "lesson": "Day 7 — Lesson 6", "pinyin": "jǔbàn", "meaning": "to hold; organize"}, {"word": "各", "lesson": "Day 7 — Lesson 6", "pinyin": "gè", "meaning": "each; every"}, {"word": "降低", "lesson": "Day 7 — Lesson 6", "pinyin": "jiàngdī", "meaning": "to lower; reduce"}, {"word": "流血", "lesson": "Day 8 — Lesson 7", "pinyin": "liúxuè", "meaning": "to bleed"}, {"word": "擦", "lesson": "Day 8 — Lesson 7", "pinyin": "cā", "meaning": "to wipe; rub"}, {"word": "气候", "lesson": "Day 8 — Lesson 7", "pinyin": "qìhòu", "meaning": "climate"}, {"word": "估计", "lesson": "Day 8 — Lesson 7", "pinyin": "gūjì", "meaning": "to estimate; estimate"}, {"word": "咳嗽", "lesson": "Day 8 — Lesson 7", "pinyin": "késou", "meaning": "to cough"}, {"word": "严重", "lesson": "Day 8 — Lesson 7", "pinyin": "yánzhòng", "meaning": "serious; severe"}, {"word": "窗户", "lesson": "Day 8 — Lesson 7", "pinyin": "chuānghu", "meaning": "window"}, {"word": "空气", "lesson": "Day 8 — Lesson 7", "pinyin": "kōngqì", "meaning": "air"}, {"word": "抽烟", "lesson": "Day 8 — Lesson 7", "pinyin": "chōuyān", "meaning": "to smoke"}, {"word": "动作", "lesson": "Day 8 — Lesson 7", "pinyin": "dòngzuò", "meaning": "movement; action"}, {"word": "帅", "lesson": "Day 8 — Lesson 7", "pinyin": "shuài", "meaning": "handsome; cool"}, {"word": "出现", "lesson": "Day 8 — Lesson 7", "pinyin": "chūxiàn", "meaning": "to appear"}, {"word": "后悔", "lesson": "Day 8 — Lesson 7", "pinyin": "hòuhuǐ", "meaning": "to regret"}, {"word": "来不及", "lesson": "Day 8 — Lesson 7", "pinyin": "láibují", "meaning": "there isn't enough time"}, {"word": "反对", "lesson": "Day 8 — Lesson 7", "pinyin": "fǎnduì", "meaning": "to oppose"}, {"word": "大夫", "lesson": "Day 8 — Lesson 7", "pinyin": "dàifu", "meaning": "doctor"}, {"word": "植物", "lesson": "Day 8 — Lesson 7", "pinyin": "zhíwù", "meaning": "plant"}, {"word": "研究", "lesson": "Day 8 — Lesson 7", "pinyin": "yánjiū", "meaning": "research; to study"}, {"word": "超过", "lesson": "Day 8 — Lesson 7", "pinyin": "chāoguò", "meaning": "to exceed; surpass"}, {"word": "散步", "lesson": "Day 8 — Lesson 7", "pinyin": "sànbù", "meaning": "to take a walk"}, {"word": "指", "lesson": "Day 8 — Lesson 7", "pinyin": "zhǐ", "meaning": "to point; refer to"}, {"word": "精神", "lesson": "Day 8 — Lesson 7", "pinyin": "jīngshén", "meaning": "spirit; energy; mental state"}, {"word": "教授", "lesson": "Day 8 — Lesson 7", "pinyin": "jiàoshòu", "meaning": "professor"}, {"word": "数字", "lesson": "Day 8 — Lesson 7", "pinyin": "shùzì", "meaning": "number; digit"}, {"word": "说明", "lesson": "Day 8 — Lesson 7", "pinyin": "shuōmíng", "meaning": "to explain; explanation"}, {"word": "要是", "lesson": "Day 8 — Lesson 7", "pinyin": "yàoshi", "meaning": "if"}, {"word": "既", "lesson": "Day 8 — Lesson 7", "pinyin": "jì", "meaning": "both; already"}, {"word": "减肥", "lesson": "Day 8 — Lesson 7", "pinyin": "jiǎnféi", "meaning": "to lose weight"}, {"word": "辛苦", "lesson": "Day 8 — Lesson 7", "pinyin": "xīnkǔ", "meaning": "hard; to work hard"}, {"word": "肚子", "lesson": "Day 8 — Lesson 7", "pinyin": "dùzi", "meaning": "belly; stomach"}, {"word": "感情", "lesson": "Day 8 — Lesson 7", "pinyin": "gǎnqíng", "meaning": "feelings; emotion; affection"}, {"word": "烦恼", "lesson": "Day 8 — Lesson 7", "pinyin": "fánnǎo", "meaning": "worry; trouble"}, {"word": "掉", "lesson": "Day 8 — Lesson 7", "pinyin": "diào", "meaning": "to fall; drop; lose"}, {"word": "巧克力", "lesson": "Day 9 — Lesson 8", "pinyin": "qiǎokèlì", "meaning": "chocolate"}, {"word": "亲戚", "lesson": "Day 9 — Lesson 8", "pinyin": "qīnqi", "meaning": "relative; kin"}, {"word": "伤心", "lesson": "Day 9 — Lesson 8", "pinyin": "shāngxīn", "meaning": "sad; heartbroken"}, {"word": "使", "lesson": "Day 9 — Lesson 8", "pinyin": "shǐ", "meaning": "to make; cause; use"}, {"word": "心情", "lesson": "Day 9 — Lesson 8", "pinyin": "xīnqíng", "meaning": "mood; state of mind"}, {"word": "愉快", "lesson": "Day 9 — Lesson 8", "pinyin": "yúkuài", "meaning": "pleasant; happy"}, {"word": "景色", "lesson": "Day 9 — Lesson 8", "pinyin": "jǐngsè", "meaning": "scenery; view"}, {"word": "放松", "lesson": "Day 9 — Lesson 8", "pinyin": "fàngsōng", "meaning": "to relax"}, {"word": "压力", "lesson": "Day 9 — Lesson 8", "pinyin": "yālì", "meaning": "pressure"}, {"word": "回忆", "lesson": "Day 9 — Lesson 8", "pinyin": "huíyì", "meaning": "memory; to recall"}, {"word": "发生", "lesson": "Day 9 — Lesson 8", "pinyin": "fāshēng", "meaning": "to happen; occur"}, {"word": "成为", "lesson": "Day 9 — Lesson 8", "pinyin": "chéngwéi", "meaning": "to become"}, {"word": "只要", "lesson": "Day 9 — Lesson 8", "pinyin": "zhǐyào", "meaning": "as long as"}, {"word": "师傅", "lesson": "Day 9 — Lesson 8", "pinyin": "shīfu", "meaning": "master; skilled worker"}, {"word": "大使馆", "lesson": "Day 9 — Lesson 8", "pinyin": "dàshǐguǎn", "meaning": "embassy"}, {"word": "堵车", "lesson": "Day 9 — Lesson 8", "pinyin": "dǔchē", "meaning": "traffic jam; traffic is congested"}, {"word": "距离", "lesson": "Day 9 — Lesson 8", "pinyin": "jùlí", "meaning": "distance"}, {"word": "耐心", "lesson": "Day 9 — Lesson 8", "pinyin": "nàixīn", "meaning": "patience; patient"}, {"word": "生命", "lesson": "Day 9 — Lesson 8", "pinyin": "shēngmìng", "meaning": "life"}, {"word": "缺少", "lesson": "Day 9 — Lesson 8", "pinyin": "quēshǎo", "meaning": "to lack; be short of"}, {"word": "到处", "lesson": "Day 9 — Lesson 8", "pinyin": "dàochù", "meaning": "everywhere"}, {"word": "态度", "lesson": "Day 9 — Lesson 8", "pinyin": "tàidu", "meaning": "attitude"}, {"word": "因此", "lesson": "Day 9 — Lesson 8", "pinyin": "yīncǐ", "meaning": "therefore; thus"}, {"word": "科学", "lesson": "Day 9 — Lesson 8", "pinyin": "kēxué", "meaning": "science; scientific"}, {"word": "证明", "lesson": "Day 9 — Lesson 8", "pinyin": "zhèngmíng", "meaning": "to prove; proof"}, {"word": "往往", "lesson": "Day 9 — Lesson 8", "pinyin": "wǎngwǎng", "meaning": "often; frequently"}, {"word": "阳光", "lesson": "Day 9 — Lesson 8", "pinyin": "yángguāng", "meaning": "sunlight; sunshine"}, {"word": "积极", "lesson": "Day 9 — Lesson 8", "pinyin": "jījí", "meaning": "active; positive; proactive"}, {"word": "特点", "lesson": "Day 9 — Lesson 8", "pinyin": "tèdiǎn", "meaning": "characteristic; feature"}, {"word": "饼干", "lesson": "Lesson 9", "pinyin": "bǐnggān", "meaning": "biscuit; cookie"}, {"word": "难道", "lesson": "Lesson 9", "pinyin": "nándào", "meaning": "could it be that...?"}, {"word": "得", "lesson": "Lesson 9", "pinyin": "dé", "meaning": "to get; obtain"}, {"word": "坚持", "lesson": "Lesson 9", "pinyin": "jiānchí", "meaning": "to persist; insist on"}, {"word": "放弃", "lesson": "Lesson 9", "pinyin": "fàngqì", "meaning": "to give up"}, {"word": "主意", "lesson": "Lesson 9", "pinyin": "zhǔyi", "meaning": "idea; plan"}, {"word": "网球", "lesson": "Lesson 9", "pinyin": "wǎngqiú", "meaning": "tennis"}, {"word": "国际", "lesson": "Lesson 9", "pinyin": "guójì", "meaning": "international"}, {"word": "轻松", "lesson": "Lesson 9", "pinyin": "qīngsōng", "meaning": "relaxed; easy"}, {"word": "赢", "lesson": "Lesson 9", "pinyin": "yíng", "meaning": "to win"}, {"word": "随便", "lesson": "Lesson 9", "pinyin": "suíbiàn", "meaning": "casually; whatever"}, {"word": "汗", "lesson": "Lesson 9", "pinyin": "hàn", "meaning": "sweat"}, {"word": "通过", "lesson": "Lesson 9", "pinyin": "tōngguò", "meaning": "to pass; through; by means of"}, {"word": "篇", "lesson": "Lesson 9", "pinyin": "piān", "meaning": "measure word for articles"}, {"word": "作家", "lesson": "Lesson 9", "pinyin": "zuòjiā", "meaning": "writer; author"}, {"word": "当时", "lesson": "Lesson 9", "pinyin": "dāngshí", "meaning": "at that time"}, {"word": "可是", "lesson": "Lesson 9", "pinyin": "kěshì", "meaning": "but; however"}, {"word": "正确", "lesson": "Lesson 9", "pinyin": "zhèngquè", "meaning": "correct"}, {"word": "理想", "lesson": "Lesson 9", "pinyin": "lǐxiǎng", "meaning": "ideal; aspiration"}, {"word": "勇敢", "lesson": "Lesson 9", "pinyin": "yǒnggǎn", "meaning": "brave; courageous"}, {"word": "结果", "lesson": "Lesson 9", "pinyin": "jiéguǒ", "meaning": "result; outcome"}, {"word": "失败", "lesson": "Lesson 9", "pinyin": "shībài", "meaning": "to fail; failure"}, {"word": "过程", "lesson": "Lesson 9", "pinyin": "guòchéng", "meaning": "process; course"}, {"word": "至少", "lesson": "Lesson 9", "pinyin": "zhìshǎo", "meaning": "at least"}, {"word": "总结", "lesson": "Lesson 9", "pinyin": "zǒngjié", "meaning": "to summarize; summary"}, {"word": "取", "lesson": "Lesson 9", "pinyin": "qǔ", "meaning": "to take; get"}, {"word": "经历", "lesson": "Lesson 9", "pinyin": "jīnglì", "meaning": "experience; undergo"}, {"word": "许多", "lesson": "Lesson 9", "pinyin": "xǔduō", "meaning": "many; much"}, {"word": "区别", "lesson": "Lesson 9", "pinyin": "qūbié", "meaning": "difference; distinguish"}, {"word": "暂时", "lesson": "Lesson 9", "pinyin": "zànshí", "meaning": "temporarily; for now"}, {"word": "面对", "lesson": "Lesson 9", "pinyin": "miànduì", "meaning": "to face; confront"}];
+let deck = [...allCards];
+let index = 0;
+
+const COMFORTABLE_KEY = 'chineseFlashcards.comfortable.v1';
+const DIFFICULT_KEY = 'chineseFlashcards.difficult.v1';
+
+function loadSet(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return new Set(Array.isArray(parsed) ? parsed : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveSet(key, set) {
+  localStorage.setItem(key, JSON.stringify([...set]));
+}
+
+const comfortableCards = loadSet(COMFORTABLE_KEY);
+const difficultCards = loadSet(DIFFICULT_KEY);
+
+function cardKey(card) {
+  return `${card.lesson}|||${card.word}`;
+}
+
+const cardEl = document.getElementById('card');
+const lessonEl = document.getElementById('lesson');
+const statusFilterEl = document.getElementById('statusFilter');
+const frontWord = document.getElementById('frontWord');
+const frontLesson = document.getElementById('frontLesson');
+const backWord = document.getElementById('backWord');
+const backLesson = document.getElementById('backLesson');
+const backPinyin = document.getElementById('backPinyin');
+const backMeaning = document.getElementById('backMeaning');
+const progress = document.getElementById('progress');
+const comfortableBtn = document.getElementById('comfortable');
+const difficultBtn = document.getElementById('difficult');
+const clearDifficultBtn = document.getElementById('clearDifficult');
+const showBtn = document.getElementById('show');
+
+const lessons = [...new Set(allCards.map(x => x.lesson))];
+lessonEl.innerHTML = '<option value="ALL">All lessons (' + allCards.length + ')</option>' +
+  lessons.map(x => '<option value="' + x.replaceAll('"','&quot;') + '">' + x + '</option>').join('');
+
+function getBaseDeck() {
+  const lesson = lessonEl.value;
+  let cards = lesson === 'ALL' ? [...allCards] : allCards.filter(x => x.lesson === lesson);
+
+  const status = statusFilterEl.value;
+  if (status === 'DIFFICULT') {
+    cards = cards.filter(x => difficultCards.has(cardKey(x)) && !comfortableCards.has(cardKey(x)));
+  } else if (status === 'COMFORTABLE') {
+    cards = cards.filter(x => comfortableCards.has(cardKey(x)));
+  } else {
+    // Comfortable cards disappear from normal review.
+    cards = cards.filter(x => !comfortableCards.has(cardKey(x)));
+  }
+  return cards;
+}
+
+function randomize(cards) {
+  for (let i=cards.length-1;i>0;i--) {
+    const j=Math.floor(Math.random()*(i+1));
+    [cards[i],cards[j]]=[cards[j],cards[i]];
+  }
+  return cards;
+}
+
+function buildDeck() {
+  deck = randomize(getBaseDeck());
+  index = 0;
+  render();
+}
+
+function updateCardContent() {
+  if (!deck.length) {
+    frontWord.textContent = '🎉';
+    backWord.textContent = '';
+    frontLesson.textContent = '';
+    backLesson.textContent = '';
+    backPinyin.textContent = '';
+    backMeaning.textContent = 'No cards in this view';
+    progress.textContent = '0 / 0';
+    showBtn.textContent = 'Show Answer';
+    comfortableBtn.disabled = true;
+    difficultBtn.disabled = true;
+    clearDifficultBtn.disabled = true;
+    return;
+  }
+
+  const c = deck[index];
+  const key = cardKey(c);
+  frontWord.textContent = c.word;
+  backWord.textContent = c.word;
+  frontLesson.textContent = c.lesson;
+  backLesson.textContent = c.lesson;
+  backPinyin.textContent = c.pinyin || "Pinyin unavailable";
+  backMeaning.textContent = c.meaning || "Meaning unavailable";
+  progress.textContent = `${index+1} / ${deck.length}`;
+  showBtn.textContent = 'Show Answer';
+  comfortableBtn.disabled = false;
+  difficultBtn.disabled = false;
+  clearDifficultBtn.disabled = !difficultCards.has(key);
+  difficultBtn.classList.toggle('active', difficultCards.has(key));
+  comfortableBtn.classList.toggle('active', comfortableCards.has(key));
+}
+
+function render() {
+  clearAutoNextTimer();
+  clearTransitionTimer();
+  cardEl.classList.remove('flipped');
+  updateCardContent();
+}
+
+let autoNextTimer = null;
+let transitionTimer = null;
+
+function clearAutoNextTimer() {
+  if (autoNextTimer) {
+    clearTimeout(autoNextTimer);
+    autoNextTimer = null;
+  }
+}
+
+function clearTransitionTimer() {
+  if (transitionTimer) {
+    clearTimeout(transitionTimer);
+    transitionTimer = null;
+  }
+}
+
+function isCurrentViewNormal() {
+  return statusFilterEl.value === 'ALL';
+}
+
+function findNextIndex(startIndex, direction) {
+  if (!deck.length) return -1;
+
+  let candidate = ((startIndex % deck.length) + deck.length) % deck.length;
+  for (let checked = 0; checked < deck.length; checked++) {
+    const c = deck[candidate];
+    const shouldSkip = isCurrentViewNormal() && comfortableCards.has(cardKey(c));
+    if (!shouldSkip) return candidate;
+    candidate = (candidate + direction + deck.length) % deck.length;
+  }
+  return -1;
+}
+
+function moveTo(indexChange) {
+  if (!deck.length) return;
+  clearAutoNextTimer();
+  clearTransitionTimer();
+
+  const direction = indexChange >= 0 ? 1 : -1;
+  let newIndex = findNextIndex(index + direction, direction);
+  if (newIndex === -1) {
+    // No cards remain in the current normal view.
+    updateCardContent();
+    return;
+  }
+
+  const wasFlipped = cardEl.classList.contains('flipped');
+
+  if (!wasFlipped) {
+    index = newIndex;
+    updateCardContent();
+    return;
+  }
+
+  // Start the flip-back. Change the word only when the card is edge-on,
+  // so the user never sees the old face turn all the way before the new word appears.
+  cardEl.classList.remove('flipped');
+  showBtn.textContent = 'Show Answer';
+
+  transitionTimer = setTimeout(() => {
+    index = newIndex;
+    updateCardContent();
+    transitionTimer = null;
+  }, 225);
+}
+
+function flip() {
+  if (!deck.length) return;
+  clearAutoNextTimer();
+
+  const isFlipped = cardEl.classList.contains('flipped');
+  if (!isFlipped) {
+    cardEl.classList.add('flipped');
+    showBtn.textContent = 'Next →';
+    autoNextTimer = setTimeout(() => {
+      next();
+      autoNextTimer = null;
+    }, 5000);
+  } else {
+    next();
+  }
+}
+
+function next() { moveTo(1); }
+function prev() { moveTo(-1); }
+
+function markComfortable() {
+  if (!deck.length) return;
+  clearAutoNextTimer();
+  clearTransitionTimer();
+
+  const current = deck[index];
+  const key = cardKey(current);
+  comfortableCards.add(key);
+  difficultCards.delete(key);
+  saveSet(COMFORTABLE_KEY, comfortableCards);
+  saveSet(DIFFICULT_KEY, difficultCards);
+
+  // Stay on the current card. It will be skipped the next time you move.
+  comfortableBtn.classList.add('active');
+  difficultBtn.classList.remove('active');
+  clearDifficultBtn.disabled = true;
+}
+
+function markDifficult() {
+  if (!deck.length) return;
+  clearAutoNextTimer();
+  clearTransitionTimer();
+
+  const current = deck[index];
+  const key = cardKey(current);
+  difficultCards.add(key);
+  comfortableCards.delete(key);
+  saveSet(DIFFICULT_KEY, difficultCards);
+  saveSet(COMFORTABLE_KEY, comfortableCards);
+
+  // Stay on the current card after marking it.
+  difficultBtn.classList.add('active');
+  comfortableBtn.classList.remove('active');
+  clearDifficultBtn.disabled = false;
+}
+
+function clearDifficult() {
+  if (!deck.length) return;
+  const current = deck[index];
+  difficultCards.delete(cardKey(current));
+  saveSet(DIFFICULT_KEY, difficultCards);
+  updateCardContent();
+}
+
+lessonEl.addEventListener('change', buildDeck);
+statusFilterEl.addEventListener('change', buildDeck);
+
+document.getElementById('shuffle').onclick = () => {
+  randomize(deck);
+  index = 0;
+  render();
+};
+
+document.getElementById('reset').onclick = () => {
+  lessonEl.value='ALL';
+  statusFilterEl.value='ALL';
+  buildDeck();
+};
+
+document.getElementById('resetComfortable').onclick = () => {
+  if (!comfortableCards.size) return;
+  if (confirm('Remove all Comfortable marks and put those cards back into normal review?')) {
+    comfortableCards.clear();
+    saveSet(COMFORTABLE_KEY, comfortableCards);
+    buildDeck();
+  }
+};
+
+document.getElementById('prev').onclick=prev;
+document.getElementById('next').onclick=next;
+showBtn.onclick=flip;
+comfortableBtn.onclick=markComfortable;
+difficultBtn.onclick=markDifficult;
+clearDifficultBtn.onclick=clearDifficult;
+cardEl.onclick=flip;
+cardEl.onkeydown=e => {
+  if(e.key==='Enter'||e.key===' ') {e.preventDefault();flip();}
+};
+
+document.addEventListener('keydown', e => {
+  if(e.target.tagName==='SELECT' || e.target.tagName==='BUTTON') return;
+  if(e.key==='ArrowRight') next();
+  else if(e.key==='ArrowLeft') prev();
+  else if(e.key===' ') {e.preventDefault();flip();}
+  else if(e.key.toLowerCase()==='r') {
+    randomize(deck);
+    index=0;
+    render();
+  }
+});
+
+buildDeck();
+</script>
+</body>
+</html>
