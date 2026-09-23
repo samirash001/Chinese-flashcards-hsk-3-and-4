@@ -76,7 +76,7 @@
   <div class="dataStatus" id="dataStatus" role="status" aria-live="polite">Vocabulary embedded in this page</div>
   <div class="progress" id="progress"></div>
 
-  <div class="card" id="card" tabindex="0" aria-label="Flashcard">
+  <div class="card" id="card" aria-label="Flashcard">
     <div class="inner">
       <div class="face front">
         <div class="lesson" id="frontLesson"></div>
@@ -434,21 +434,6 @@ comfortableBtn.onclick=markComfortable;
 difficultBtn.onclick=markDifficult;
 clearDifficultBtn.onclick=clearDifficult;
 cardEl.onclick=flip;
-cardEl.onkeydown=e => {
-  if(e.key==='Enter'||e.key===' ') {e.preventDefault();flip();}
-};
-
-document.addEventListener('keydown', e => {
-  if(e.target.tagName==='SELECT' || e.target.tagName==='BUTTON') return;
-  if(e.key==='ArrowRight') next();
-  else if(e.key==='ArrowLeft') prev();
-  else if(e.key===' ') {e.preventDefault();flip();}
-  else if(e.key.toLowerCase()==='r') {
-    randomize(deck);
-    index=0;
-    render();
-  }
-});
 
 updatePartVisibility();
 buildDeck();
